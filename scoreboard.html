@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Team Scoreboard</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background: #f0f4f7;
+      padding: 20px;
+      overflow-x: hidden;
+    }
+
+    h1 { margin-bottom: 40px; }
+
+    .teams-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .team {
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      padding: 20px;
+      width: 250px;
+      transition: transform 0.3s ease;
+      position: relative;
+    }
+
+    .team.level-up { animation: bounce 0.5s; }
+
+    @keyframes bounce {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.3); }
+      100% { transform: scale(1); }
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 5px 10px;
+      border-radius: 12px;
+      color: #fff;
+      font-weight: bold;
+      min-width: 40px;
+    }
+
+    .points.flash {
+      animation: flash 0.5s;
+    }
+
+    @keyframes flash {
+      0% { opacity: 1; }
+      50% { opacity: 0.3; transform: scale(1.2); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+
+    input[type="number"] { width: 60px; padding: 5px; margin-top: 10px; }
+
+    button {
+      margin-top: 10px;
+      padding: 5px 10px;
+      cursor: pointer;
+      border: none;
+      border-radius: 5px;
+      background: #007bff;
+      color: #fff;
+      transition: background 0.3s;
+    }
+
+    button:hover { background: #0056b3; }
+
+    #winner {
+      margin-top: 40px;
+      font-size: 24px;
+      font-weight: bold;
+      color: #d63384;
+    }
+
+    #resetBtn { margin-top: 20px; background: #dc3545; }
+    #resetBtn:hover { background: #a71d2a; }
+
+    .confetti {
+      position: fixed;
+      width: 10px;
+      height: 10px;
+      pointer-events: none;
+      z-index: 9999;
+      opacity: 0.8;
+      animation: fall 3s linear forwards;
+    }
+
+    @keyframes fall {
+      0% { transform: translateY(0) rotate(0deg); }
+      100% { transform: translateY(100vh) rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Team Scoreboard</h1>
+  
+
+
+  <div class="teams-container" id="teams-container"></div>
+
+  <h2 id="winner"></h2>
+
+  <!-- Control buttons -->
+  <button onclick="calculateWinner()">Calculate Winner</button>
+  <button id="resetBtn" onclick="resetGame()">Reset Game</button>
+  <!-- Sounds -->
+  <audio id="levelUpSound" src="https://www.soundjay.com/button/sounds/button-3.mp3" preload="auto"></audio>
+  <audio id="winSound" src="https://www.soundjay.com/human/sounds/applause-8.mp3" preload="auto"></audio>
+
+  <script>
+    const levelThreshold = 50;
+    const teamData = [
+      {name:"Team A", color:"#e74c3c"},
+      {name:"Team B", color:"#3498db"},
+      {name:"Team C", color:"#2ecc71"},
+      {name:"Team D", color:"#f1c40f"},
+      {name:"Team E", color:"#9b59b6"},
+      {name:"Team F", color:"#e67e22"},
+      {name:"Team G", color:"#1abc9c"},
+      {name:"Team H", color:"#34495e"},
+      {name:"Team I", color:"#d35400"},
+      {name:"Team J", color:"#c0392b"}
+    ];
+
+    const teamsContainer = document.getElementById('teams-container');
+    const teams = {};
+    const levelUpSound = document.getElementById('levelUpSound');
+    const winSound = document.getElementById('winSound');
+
+    // Generate teams dynamically
+    teamData.forEach((data, index) => {
+      const teamId = `team${index+1}`;
+      teams[teamId] = { name: data.name, points: 0, level: 1, color: data.color };
+
+      const teamDiv = document.createElement('div');
+      teamDiv.className = 'team';
+      teamDiv.id = teamId;
+      teamDiv.innerHTML = `
+        <h2>${data.name}</h2>
+        <p>Points: <span class="badge points" style="background-color:${data.color}">0</span></p>
+        <p>Level: <span class="badge level" style="background-color:${data.color}">1</span></p>
+        <input type="number" id="${teamId}-input" placeholder="Points" />
+        <button onclick="addPoints('${teamId}')">Add Points</button>
+      `;
+      teamsContainer.appendChild(teamDiv);
+    });
+
+    function addPoints(teamId) {
+      const teamDiv = document.getElementById(teamId);
+      const pointsSpan = teamDiv.querySelector('.points');
+      const levelSpan = teamDiv.querySelector('.level');
+      const input = document.getElementById(`${teamId}-input`);
+
+      let pointsToAdd = parseInt(input.value);
+      if (isNaN(pointsToAdd) || pointsToAdd <= 0) return alert("Enter a valid positive number!");
+
+      teams[teamId].points += pointsToAdd;
+      pointsSpan.textContent = teams[teamId].points;
+
+      pointsSpan.classList.add('flash');
+      setTimeout(() => pointsSpan.classList.remove('flash'), 500);
+
+      // Update level
+      let newLevel = Math.floor(teams[teamId].points / levelThreshold) + 1;
+      if (newLevel > teams[teamId].level) {
+        teams[teamId].level = newLevel;
+        levelSpan.textContent = newLevel;
+        teamDiv.classList.add('level-up');
+        setTimeout(() => teamDiv.classList.remove('level-up'), 500);
+        levelUpSound.currentTime = 0;
+        levelUpSound.play();
+      }
+
+      input.value = "";
+      updateLeaderboard();
+    }
+
+    function updateLeaderboard() {
+      const sortedTeams = Object.keys(teams).sort((a,b) => teams[b].points - teams[a].points);
+      sortedTeams.forEach(teamId => {
+        const teamDiv = document.getElementById(teamId);
+        teamsContainer.appendChild(teamDiv);
+      });
+    }
+
+    function calculateWinner() {
+      let highestPoints = 0;
+      let winners = [];
+
+      Object.keys(teams).forEach(teamId => {
+        const pts = teams[teamId].points;
+        if (pts > highestPoints) {
+          highestPoints = pts;
+          winners = [teams[teamId].name];
+        } else if (pts === highestPoints) {
+          winners.push(teams[teamId].name);
+        }
+      });
+
+      const winnerEl = document.getElementById('winner');
+      if (winners.length > 0) {
+        winnerEl.textContent = winners.length === 1 ? `${winners[0]} Wins!` : `It's a Tie: ${winners.join(', ')}`;
+        winSound.currentTime = 0;
+        winSound.play();
+        launchConfetti();
+      }
+    }
+
+    function resetGame() {
+      Object.keys(teams).forEach(teamId => {
+        teams[teamId].points = 0;
+        teams[teamId].level = 1;
+        const teamDiv = document.getElementById(teamId);
+        teamDiv.querySelector('.points').textContent = 0;
+        teamDiv.querySelector('.level').textContent = 1;
+        document.getElementById(`${teamId}-input`).value = "";
+      });
+      document.getElementById('winner').textContent = "";
+      document.querySelectorAll('button').forEach(btn => btn.disabled = false);
+    }
+
+    function launchConfetti() {
+      for (let i = 0; i < 150; i++) {
+        const confetti = document.createElement('div');
+        confetti.className = 'confetti';
+        confetti.style.backgroundColor = `hsl(${Math.random()*360}, 100%, 50%)`;
+        confetti.style.left = Math.random()*100 + 'vw';
+        confetti.style.animationDuration = 2 + Math.random()*2 + 's';
+        document.body.appendChild(confetti);
+        setTimeout(() => confetti.remove(), 4000);
+      }
+    }
+  </script>
+
+</body>
+</html>
